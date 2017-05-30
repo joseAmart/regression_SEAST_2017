@@ -1,0 +1,314 @@
+Trabajo Regresión lineal: predicción de la nota media de los alumnos grado de la ETSIT UPCT. Segunda parte.
+========================================================
+
+Nombre: JOSE AGUSTIN
+
+Apellidos: MARTINEZ CANOVAS
+
+```{r preliminares}
+## Completar aquí
+library(dplyr)
+library(ggplot2)
+```
+
+> En este trabajo, usamos datos asociados a todos los alumnos de Grado en Ingeniería Telemática y Grado en Ingeniería de Sistemas de Telecomunicación de la UPCT, que hayan superado 120 ECTS, que provengan de la Región de Murcia y que se hayan examinado de Física y Matemáticas_II en la Prueba de Acceso a la Universidad (PAU).
+
+# Objetivo:
+
+Nuestro objetivo es estudiar la posibilidad de predecir la nota media a partir de algunos datos en el ingreso del estudiante (calificación y decil PAU, así como de Física y Matemáticas II) y de sus resultados en algunas de las asignaturas más exigentes de la titulación:
+
+1. Fundamentos de programación.
+2. Sistemas y circuitos.
+3. Teoría de la comunicación.
+
+
+# Segundo paso: conjunto completo 
+Vamos a trabajar con el conjunto completo. El fichero que contiene los datos es notamediagradosETSIT-completo.csv  que se puede descargar del Aula Virtual y guardar en la carpeta data del directorio asociado a nuestro nuevo proyecto.
+
+Cargar los datos en un dataframe llamado **GradosTeleco**
+```{r}
+## Completar aqui
+GradosTeleco <- read.table(file = "data/notamediagradosETSIT-completo.csv", header=TRUE, sep=";",    stringsAsFactors = FALSE)
+```
+
+Tenemos las variables siguientes:
+
+- notamedia: 
+  La nota media está calculada con las calificaciones de cada asignatura en una escala que va de 1 a 4 (1 es "Aprobado"", 2 "Notable", 3 "Sobresaliente", 4 "Matrícula de Honor")
+- PAU_CALIFICACION_NOTA_MATERIA y PAU_CALIFICACION_NOTA_MATERIA_DECIL: nota final (sobre 10)  y DECIL del alumno en su año de PAU, respecto a todos los alumnos presentados a PAU ese año.
+- FISICA_NOTA_MATERIA"  y  "FISICA_NOTA_MATERIA_decil" nota y decil en la materia de Física en la PAU
+- MATEMATICAS_II_NOTA_MATERIA"  y  "MATEMATICAS_II_NOTA_MATERIA_DECIL" nota y decil en la materia de MATEMATICAS_II en la PAU.
+
+Además, para cada una de las asignaturas seleccionadas de la UPCT, tenemos tres variables:
+
+- ****_NOTA: la nota sobre 10 obtenida en la asignatura
+- ****_CONVOCS_PRESENTADAS_ACUMULA: el número de convocatorias presentadas para superar la asignatura
+- ****_CONVOCS_HASTA_1RA_VEZ_ el número de convocatorias que ha necesitado para presentarse por primera vez a la asignatura.
+
+Nota: en el caso de asignaturas reconocidas, estas dos últimas variables valen 0.
+
+
+## Construcción de un conjunto de entrenamiento y otro conjunto de test...
+Para poder comprobar la posibilidad de predecir la nota media a partir de las variables que nos interesan, vamos a construir un conjunto de entrenamiento (Learning set) y otro de test:
+- Con el conjunto de entrenamiento, llevaremos a cabo el ajuste de regresión lineal obteniendo la relación 
+$$notamedia=\theta_0+\theta_1x_1+\ldots\theta_k x_k,$$
+donde $x_1,\ x_2,\ldots,x_k$ son las características que consideraremos.
+- Con el conjunto de test, aplicaremos el modelo ajustado obtenido con el conjunto de entrenamiento para predecir la  nota media y veremos qué error cometemos, puesto que en realidad conocemos cuál fue la nota media de los alumnos del conjunto test.
+
+### Selección del conjunto training
+
+Usando la instrucción **sample** (ver ayuda), podemos escoger entre las posiciones de los individudos del conjunto GradosTeleco, los que escogeremos para el conjunto de entrenamiento. Escogeremos al azar 70% de los individuos totales (es decir 70 alumnos aprox.).
+
+```{r}
+set.seed(seed=1) # fijamos la semilla del algoritmo aleatorio para
+## poder comparar  nuestros resultados con los de compañeros
+## completar aquí: para obtener el vector training.posiciones
+training.posiciones<- sample(1:nrow(GradosTeleco),nrow(GradosTeleco)*0.7)
+## completar aquí para construir el subconjunto GradosTeleco.training que 
+## corresponda a los GradosTeleco escogidos
+
+
+GradosTeleco.training<- GradosTeleco[training.posiciones,]
+
+
+```
+
+Si no os habéis equivocado, tenéis que haber obtenido para los 10 primeras posiciones de training.posiciones, los siguientes valores:
+
+ 27 37 55 87 19 84 95 61 57  6 94 
+
+### Selección del conjunto test.
+
+Debemos ahora construir el conjunto test que consistirá en los GradosTeleco que no han sido seleccionado para el conjunto training. Para ello, usaremos primero el operador lógico **%in%** que permite comprobar la pertenencia a un vector de valores.
+```{r}
+## nada que completar, pero sí podéis comprobar que entendéis el código:
+test.posiciones <- which(! (row.names(GradosTeleco) %in% training.posiciones))
+
+
+
+## hemos usado la negación lógica que es !, 
+## (es decir !FALSE es TRUE, y !TRUE es FALSE)
+```
+
+Ahora podéis crear el data.frame GradosTeleco.test, subconjunto del dataframe GradosTeleco, que contenga los GradosTeleco escogidos para formar parte del conjunto test.
+```{r}
+## Completar aquí para construir el dataframe GradosTeleco.test
+GradosTeleco.test<- GradosTeleco[test.posiciones,]
+```
+
+
+## Predicción con solamente las variables PAU.
+
+Para ir más rápido, usaremos las soluciones analíticas a las ecuaciones normales para la regresión lineal tal como nos las da la instrucción **lm** y no usaremos el algoritmo del gradiente.
+
+### Ajuste con lm
+
+Crear un objeto **training.lm.PAU** que sea el resultado de llevar a cabo, con el conjunto GradosTeleco.training el ajuste lineal para predecir la nota  media en función de las variables PAU del conjunto. 
+
+** NOTA ** Un pequeño truco para escribir las fórmulas más rapidamente con todas esas variables: se puede usar en la consola paste con el argumento collapse
+```{r}
+## nada que completar aquí
+paste(names(GradosTeleco)[-1],collapse=" + ")
+```
+Así obtenemos una larga cadena de caractéres que podemos aprovechar para copiar y pegar para facilitar la redacción de la fórmula en lm...
+
+
+```{r}
+## Completar aquí para obtener el objeto training.lm.PAU
+training.lm.PAU <- lm(data = GradosTeleco.training, notamedia ~ PAU_CALIFICACION_NOTA_MATERIA + PAU_CALIFICACION_NOTA_MATERIA_DECIL + FISICA_NOTA_MATERIA + FISICA_NOTA_MATERIA_DECIL + MATEMATICAS_II_NOTA_MATERIA + MATEMATICAS_II_NOTA_MATERIA_DECIL)
+summary(training.lm.PAU)
+```
+
+### Predicción sobre el conjunto test.
+
+Debemos ahora usar el comando **predict** que se aplica a un objeto resultado del ajuste con lm, y que admite como argumento un data.frame para el cual queremos hacer las predicciones (en nuestro caso GradosTeleco.test).
+
+Crear un objeto llamado test.predict.PAU, que contenga el resultado de las predicciones para los individuos del conjunto de test, usando el ajuste de training.lm.PAU
+```{r}
+## Completar aquí par crear test.predict.PAU
+test.predict.PAU <- predict(training.lm.PAU,GradosTeleco.test)
+```
+
+Si no os habéis equivocado tenéis que obtener para los seis primeros valores:
+  3     8    15    18    26    30 
+  
+1.878 1.745 1.723 1.801 1.678 1.362 
+
+### Comprobación de la calidad de la predicción para el conjunto test.
+
+Cremos ahora el vector errores.predict.PAU que contenga los errores que hemos cometido en la predicción de las notas medias para el conjunto test, si usamos el ajuste solamente con las características PAU de los alumnos...
+
+```{r}
+## Completar aquí para obtener el vector errores.predict.PAU
+errores.predict.PAU<-abs(test.predict.PAU - GradosTeleco.test$notamedia) 
+```
+
+Para poder compararlo más adelante con otros ajustes (una vez que introduzcamos más características para mejor la predicción...), vamos a meter estos errores en un dataframe.
+```{r}
+### Nada que completar, pero sí comprobar que entendéis el código
+errores <- data.frame(caracteristicas = "Sólo PAU", 
+                      errores = errores.predict.PAU)
+```
+
+
+Para comprobar la calidad de nuestra predicción, debemos ver si los errores son grandes. Podemos empezar por realizar una gráfica de densidad para visualizar su distribución (con ggplot, usando geom_density, rellenando con un color azul con transparencia 0.5)
+
+```{r}
+### Completar aquí, usando ggplot con geom_density,
+errores %>% ggplot(aes(x=errores)) + geom_density(fill = "blue", alpha = 0.5)
+```
+  
+
+Para obtener indicadores numéricos de la calidad de la predicción, calcularemos tres cosas:
+
+1. El error cuadrático media de la predicción: es decir la media de los errores elevados al cuadrado. 
+2. El porcentaje de GradosTeleco en el conjunto test para los cuáles el valor absoluto del error es menor que un cuarto de punto..
+3. El porcentaje de GradosTeleco en el conjunto test para los cuáles el valor absoluto del error es menor que una décima de punto.
+
+Vamos a crear con dplyr un dataframe que llamaremos **resumenerrores**, que sea el resultado de agrupar **errores** (que ya tenemos definido) por la columna **caracteristicas* y resumir para obtener los tres indicadores arriba definidos.
+
+```{r resumenerrores}
+## Completar aquí para obtener resumenerrores
+resumenerrores <- errores %>% 
+  group_by(caracteristicas) %>%
+  summarise (error_cuadratico_medio = mean(errores^2, na.rm = TRUE),
+             por25 = sum(abs(errores) < 0.25, na.rm = TRUE) / length(errores) *100,
+             por10 = sum(abs(errores) < 0.10, na.rm = TRUE) / length(errores) *100)
+```
+
+## Predicción con las variables PAU y las variables de las asignaturas seleccionadas de primer curso
+
+Vamos ahora a añadir como características las variables asociadas a las asignaturas
+" Fundamentos de programación" y "Sistemas y circuitos" que son asignaturas de primer curso respectivamente.
+
+Seguiremos los mismos pasos que para el ajuste con solamente variables PAU.
+
+### Ajuste con lm
+
+Crear un objeto **training.lm.PAU.primercurso** que sea el resultado de llevar a cabo, con el conjunto GradosTeleco.training el ajuste lineal para predecir la nota  media en función de las variables PAU del conjunto.
+
+```{r}
+## Completar aquí para obtener training.lm.PAU.primeroscursos
+training.lm.PAU.primercurso <- lm(data = GradosTeleco.training, notamedia ~ PAU_CALIFICACION_NOTA_MATERIA + PAU_CALIFICACION_NOTA_MATERIA_DECIL + FISICA_NOTA_MATERIA + FISICA_NOTA_MATERIA_DECIL + MATEMATICAS_II_NOTA_MATERIA + MATEMATICAS_II_NOTA_MATERIA_DECIL+ SISTEMAS_Y_CIRCUITOS_NOTA+ FUNDAMENTOS_DE_PROGRAMACION_NOTA)
+summary(training.lm.PAU.primercurso)
+```
+
+### Predicción de la nota media para el conjunto test
+Crear un objeto llamado test.predict.PAU.primeroscursos, que contenga el resultado de las predicciones para los individuos del conjunto de test, usando el ajuste de training.lm.PAU.primeroscursos
+```{r}
+## Completar aquí par crear test.predict.PAU.primeros cursos
+test.predict.PAU.primeroscursos <- predict(training.lm.PAU.primercurso,GradosTeleco.test)
+```
+
+### Comprobación de la calidad de la predicción para el conjunto test.
+
+Cremos ahora el vector errores.predict.PAU.primeroscursos que contenga los errores que hemos cometido en la predicción de las notas medias para el conjunto test, si usamos el nuevo ajuste.
+```{r}
+## Completar aquí para obtener el vector errores.predict.PAU.primeroscursos
+errores.predict.PAU.primercurso<-abs(test.predict.PAU.primeroscursos - GradosTeleco.test$notamedia) 
+```
+
+Vamos ahora a añadir estos errores al dataframe errores que ya contenía los errores para el ajuste con solamente las características PAU.
+```{r}
+### Nada que completar, pero sí comprobar que entendéis el código
+errores <- rbind(errores,
+                 data.frame(caracteristicas = "PAU y primer curso",
+                            errores = errores.predict.PAU.primercurso))
+```
+
+Realizamos ahora una gráfica de densidad para visualizar la distribución de los errores cometidos en la predicción, pero distinguiendo entre los dos ajustes que hemos probado hasta el momento (usando por ejemplo que el color de relleno de la gráfica sea distinta para cada ajuste)
+
+```{r}
+### Completar aquí, usando ggplot con geom_density,
+errores %>%  ggplot(aes(x = errores, fill = caracteristicas)) +
+  geom_density(alpha = 0.5)
+
+```
+
+Finalmente, vamos a obtener los tres indicadores numéricos de la calidad de la predicción, al igual que para el ajuste anterior. Lo hacemos reutilizando el bloque "chunk" que ya programamos, sin necesidad de copiar y pegar, usando la opción ref.label: 
+
+```{r , ref.label='resumenerrores'}
+## nada que completar aquí
+```
+
+
+
+## Predicción con todas las características disponibles en el conjunto
+
+Vamos ahora a usar todas las características disponibles en el conjunto de datos.
+
+Seguiremos los mismos pasos que para los ajustes anteriores
+
+### Ajuste con lm
+
+Crear un objeto **training.lm.completo** que sea el resultado de llevar a cabo, con el conjunto GradosTeleco.training el ajuste lineal para predecir la nota  media en función de todas las características. (podréis usar el hecho de que para incluir todas las variables en una fórmula de lm, podemos usar el punto . )
+
+```{r}
+## Completar aquí para obtener training.lm.completo
+training.lm.completo <- lm(data = GradosTeleco.training, notamedia ~ .)
+summary(training.lm.completo)
+```
+### Predicción de la nota media para el conjunto test
+Crear un objeto llamado test.predict.completo  , que contenga el resultado de las predicciones para los individuos del conjunto de test, usando el ajuste de training.lm.completo  
+```{r}
+## Completar aquí par crear test.predict.PAU.primeros cursos
+test.predict.completo <- predict(training.lm.completo,GradosTeleco.test)
+```
+
+### Comprobación de la calidad de la predicción para el conjunto test.
+
+Cremos ahora el vector errores.predict.completo   que contenga los errores que hemos cometido en la predicción de las notas medias para el conjunto test, si usamos el nuevo ajuste.
+```{r}
+## Completar aquí para obtener el vector errores.predict.completo  
+errores.predict.completo<-abs(test.predict.completo - GradosTeleco.test$notamedia)
+```
+
+Vamos ahora a añadir estos errores al dataframe errores que ya contenía los errores para el ajuste con solamente las características PAU.
+```{r}
+### Completar aquí
+errores <- rbind(errores,
+                 data.frame(caracteristicas = "Todas",
+                            errores = errores.predict.completo))
+```
+
+Realizamos ahora una gráfica de densidad para visualizar la distribución de los errores cometidos en la predicción, pero distinguiendo entre los tres ajustes
+
+```{r}
+### Completar aquí, usando ggplot con geom_density,
+errores %>% 
+  ggplot(aes(x = errores, fill = caracteristicas)) +geom_density(alpha = 0.5)
+```
+
+Finalmente, vamos a obtener los tres indicadores numéricos de la calidad de la predicción, al igual que para el ajuste anterior.
+
+
+```{r , ref.label='resumenerrores'}
+## nada que completar aquí
+```
+
+## Comparación de los tres ajustes
+
+En la tabla siguiente, recogemos la calidad de predicción obtenida con los tres ajustes:
+
+```{r, results='asis'}
+## nada que completar aquí
+library("xtable")
+print(xtable(resumenerrores), type = "html", include.rownames =FALSE)
+```
+
+En su opinión, ¿merece la pena incluir las asignaturas de la UPCT en la predicción?
+
+## Representación gráfica para el ajuste completo...
+
+Para visualizar nuestra predicción, usando el ajuste completo,  sobre el conjunto test, vamos a representar una nube de puntos de la nota media en función de la calificación obtenida en la PAU, PAU_CALIFICACION_NOTA_MATERIA, y añadiremos puntos rojos que corresponden a nuestra predicción de cada nota media usando el modelo completo.
+
+```{r}
+## Completar aquí, con la representación de notamedia 
+## en función de PAU_CALIFICACION_NOTA_MATERIA
+GradosTeleco.test %>% 
+  mutate(prediccion = test.predict.completo) %>%
+  ggplot(aes(x = PAU_CALIFICACION_NOTA_MATERIA, y = notamedia)) +
+  geom_point(color = "black") +
+  geom_point(aes(x = PAU_CALIFICACION_NOTA_MATERIA, y = prediccion, color = "red"))
+```
+
